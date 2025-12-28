@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSA Visualizer: The Root of Everything</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --accent-array: #00d4ff;
+            --accent-ll: #ff007a;
+            --memory-slot: #333;
+            --highlight: #ffd700;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px;
+            max-width: 800px;
+        }
+
+        h1 { margin-bottom: 5px; }
+        .subtitle { color: #888; font-style: italic; }
+
+        /* The Control Panel */
+        .controls {
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.1s;
+        }
+
+        button:active { transform: scale(0.95); }
+        .btn-array { background-color: var(--accent-array); color: #000; }
+        .btn-ll { background-color: var(--accent-ll); color: #fff; }
+        .btn-reset { background-color: #555; color: #fff; }
+
+        /* The Memory Grid */
+        .memory-container {
+            width: 90%;
+            max-width: 900px;
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #333;
+            position: relative;
+        }
+
+        .memory-label {
+            position: absolute;
+            top: -10px;
+            left: 20px;
+            background: var(--bg-color);
+            padding: 0 10px;
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .memory-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .slot {
+            height: 60px;
+            background-color: var(--memory-slot);
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+            position: relative;
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+        }
+
+        .slot-addr {
+            font-size: 0.7em;
+            color: #666;
+            margin-bottom: 2px;
+        }
+
+        .slot-val {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .slot-next {
+            font-size: 0.6em;
+            color: #aaa;
+            display: none;
+        }
+
+        /* States */
+        .slot.array-node {
+            border-color: var(--accent-array);
+            box-shadow: 0 0 5px var(--accent-array);
+        }
+        
+        .slot.ll-node {
+            border-color: var(--accent-ll);
+            box-shadow: 0 0 5px var(--accent-ll);
+        }
+
+        .slot.active {
+            background-color: var(--highlight) !important;
+            color: black !important;
+            transform: scale(1.1);
+            z-index: 10;
+        }
+
+        /* Explanation Box */
+        .explanation {
+            margin-top: 20px;
+            background: #252525;
+            padding: 15px;
+            border-left: 4px solid #fff;
+            width: 90%;
+            max-width: 870px;
+            line-height: 1.5;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #333;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            margin-right: 5px;
+            font-weight: bold;
+        }
+        .tag-arr { background: var(--accent-array); color: #000; }
+        .tag-ll { background: var(--accent-ll); color: #fff; }
+        
+        /* Connector Lines (SVG) */
+        #connections {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>DSA Internal Visualizer</h1>
+        <div class="subtitle">"The true base is: MEMORY + VARIABLES"</div>
+    </header>
+
+    <div class="controls">
+        <button class="btn-array" onclick="createArray()">Create Array (Size 5)</button>
+        <button class="btn-ll" onclick="createLinkedList()">Create Linked List (3 Nodes)</button>
+        <button class="btn-reset" onclick="resetMemory()">Reset Memory</button>
+        <button class="btn-reset" onclick="simulateAccess()">Simulate Access</button>
+    </div>
+
+    <div class="memory-container">
+        <div class="memory-label">SYSTEM MEMORY (RAM)</div>
+        <svg id="connections"></svg>
+        <div class="memory-grid" id="memoryGrid">
+            </div>
+    </div>
+
+    <div class="explanation" id="logBox">
+        <div class="log-entry">👉 Welcome. This grid represents your computer's raw memory (RAM). Each box is an address. Click buttons to see how structures claim this space.</div>
+    </div>
+
+    <script>
+        const MEMORY_SIZE = 32;
+        const memoryGrid = document.getElementById('memoryGrid');
+        const logBox = document.getElementById('logBox');
+        const svgCanvas = document.getElementById('connections');
+        let memory = new Array(MEMORY_SIZE).fill(null); // null = empty
+        
+        // Initialize Grid
+        function initGrid() {
+            memoryGrid.innerHTML = '';
+            for(let i=0; i<MEMORY_SIZE; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'slot';
+                slot.id = `slot-${i}`;
+                slot.innerHTML = `
+                    <span class="slot-addr">0x${i.toString(16).toUpperCase().padStart(2, '0')}</span>
+                    <span class="slot-val">-</span>
+                    <span class="slot-next" id="next-${i}"></span>
+                `;
+                memoryGrid.appendChild(slot);
+            }
+            log("System Memory initialized. All bytes free.");
+        }
+
+        function log(msg, type='info') {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            let tag = '';
+            if(type === 'array') tag = '<span class="tag tag-arr">ARRAY</span>';
+            if(type === 'll') tag = '<span class="tag tag-ll">LINKED LIST</span>';
+            entry.innerHTML = `${tag} ${msg}`;
+            logBox.prepend(entry);
+        }
+
+        function resetMemory() {
+            memory = new Array(MEMORY_SIZE).fill(null);
+            svgCanvas.innerHTML = '';
+            const slots = document.querySelectorAll('.slot');
+            slots.forEach(s => {
+                s.className = 'slot';
+                s.querySelector('.slot-val').innerText = '-';
+                s.querySelector('.slot-next').style.display = 'none';
+            });
+            log("Memory wiped.");
+        }
+
+        // --- ARRAY LOGIC ---
+        function createArray() {
+            const size = 5;
+            // Find contiguous space
+            let startIdx = -1;
+            for(let i=0; i <= MEMORY_SIZE - size; i++) {
+                let fits = true;
+                for(let j=0; j<size; j++) {
+                    if(memory[i+j] !== null) fits = false;
+                }
+                if(fits) {
+                    startIdx = i;
+                    break;
+                }
+            }
+
+            if(startIdx === -1) {
+                log("❌ Not enough CONTIGUOUS memory for Array!", "array");
+                return;
+            }
+
+            // Allocate
+            for(let i=0; i<size; i++) {
+                const idx = startIdx + i;
+                memory[idx] = { type: 'array', index: i };
+                const el = document.getElementById(`slot-${idx}`);
+                el.classList.add('array-node');
+                el.querySelector('.slot-val').innerText = `A[${i}]`;
+                
+                // Animation delay
+                setTimeout(() => {
+                    el.classList.add('active');
+                    setTimeout(() => el.classList.remove('active'), 300);
+                }, i * 100);
+            }
+            log(`Allocated Array at Address 0x${startIdx.toString(16)}. Note: They are side-by-side.`, "array");
+        }
+
+        // --- LINKED LIST LOGIC ---
+        function createLinkedList() {
+            const size = 3;
+            let indices = [];
+            
+            // Find random empty spots
+            for(let i=0; i<size; i++) {
+                let rnd;
+                let attempts = 0;
+                do {
+                    rnd = Math.floor(Math.random() * MEMORY_SIZE);
+                    attempts++;
+                } while ((memory[rnd] !== null || indices.includes(rnd)) && attempts < 100);
+                
+                if(attempts >= 100) {
+                    log("❌ Memory full/fragmented!", "ll");
+                    return;
+                }
+                indices.push(rnd);
+            }
+            
+            // Sort indices just for visual cleanliness in finding them, 
+            // but in reality LL nodes can be anywhere. Let's keep them random order logic?
+            // Actually, let's link them in the order we found them to show jumping.
+            
+            for(let i=0; i<size; i++) {
+                const current = indices[i];
+                const next = (i < size - 1) ? indices[i+1] : null;
+                
+                memory[current] = { type: 'll', next: next };
+                
+                const el = document.getElementById(`slot-${current}`);
+                el.classList.add('ll-node');
+                el.querySelector('.slot-val').innerText = `Node ${i+1}`;
+                
+                if(next !== null) {
+                    const nextEl = el.querySelector('.slot-next');
+                    nextEl.style.display = 'block';
+                    nextEl.innerText = `→ 0x${next.toString(16)}`;
+                    drawArrow(current, next);
+                }
+
+                // Animation
+                setTimeout(() => {
+                    el.classList.add('active');
+                    setTimeout(() => el.classList.remove('active'), 300);
+                }, i * 300);
+            }
+            log(`Allocated Linked List. Note: Scattered in memory, connected by pointers.`, "ll");
+        }
+
+        function drawArrow(fromIdx, toIdx) {
+            const fromEl = document.getElementById(`slot-${fromIdx}`);
+            const toEl = document.getElementById(`slot-${toIdx}`);
+            
+            const rect1 = fromEl.getBoundingClientRect();
+            const rect2 = toEl.getBoundingClientRect();
+            const containerRect = memoryGrid.getBoundingClientRect();
+
+            // Calculate center points relative to container
+            const x1 = rect1.left + rect1.width/2 - containerRect.left;
+            const y1 = rect1.top + rect1.height/2 - containerRect.top;
+            const x2 = rect2.left + rect2.width/2 - containerRect.left;
+            const y2 = rect2.top + rect2.height/2 - containerRect.top;
+
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+            line.setAttribute('stroke', '#ff007a');
+            line.setAttribute('stroke-width', '2');
+            line.setAttribute('stroke-dasharray', '5,5'); // Dashed to show "virtual" link
+            
+            svgCanvas.appendChild(line);
+        }
+
+        // --- ACCESS SIMULATION ---
+        async function simulateAccess() {
+            // Check if we have an array or LL to access
+            const hasArray = memory.some(m => m && m.type === 'array');
+            const hasLL = memory.some(m => m && m.type === 'll');
+
+            if(hasArray) {
+                log("⚡ Array Access (Index 3): Calculating Start + 3...", "array");
+                // Find start
+                const startIdx = memory.findIndex(m => m && m.type === 'array' && m.index === 0);
+                if(startIdx > -1 && startIdx + 3 < MEMORY_SIZE) {
+                    const target = document.getElementById(`slot-${startIdx+3}`);
+                    target.classList.add('active');
+                    setTimeout(() => target.classList.remove('active'), 1000);
+                    log("✅ Direct hit! O(1) Time. No hopping required.", "array");
+                }
+            }
+            
+            if(hasLL && hasArray) await new Promise(r => setTimeout(r, 1500)); // Pause if showing both
+
+            if(hasLL) {
+                log("🐢 Linked List Access (Node 3): Must traverse links...", "ll");
+                // Find head (simplification: finding the first allocated LL node for demo)
+                // In real app we track Head. Here we find the first LL node created.
+                // We just traverse the 'indices' logic if we stored it, but let's just find the node pointing to something.
+                
+                // Quick hack for demo: Find the node that is type LL and is Node 1
+                let currentIdx = -1;
+                for(let i=0; i<MEMORY_SIZE; i++) {
+                    const el = document.getElementById(`slot-${i}`);
+                    if(el.innerText.includes("Node 1")) {
+                        currentIdx = i;
+                        break;
+                    }
+                }
+
+                let count = 0;
+                while(currentIdx !== -1 && count < 3) {
+                    const el = document.getElementById(`slot-${currentIdx}`);
+                    el.classList.add('active');
+                    await new Promise(r => setTimeout(r, 600)); // Wait
+                    el.classList.remove('active');
+                    
+                    const memData = memory[currentIdx];
+                    if(memData && memData.next !== null) {
+                        currentIdx = memData.next;
+                    } else {
+                        currentIdx = -1;
+                    }
+                    count++;
+                }
+                log("✅ Arrived at Node 3. O(n) Time. Had to follow every arrow.", "ll");
+            }
+        }
+
+        // Run init
+        initGrid();
+        
+        // Handle resize for arrows
+        window.addEventListener('resize', () => {
+            resetMemory();
+            log("Window resized - memory reset for visual consistency.");
+        });
+
+    </script>
+</body>
+</html>
