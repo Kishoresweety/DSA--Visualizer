@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSA Visualizer: Heaps & Trees</title>
+    <style>
+        :root {
+            --bg: #121212;
+            --panel: #1e1e1e;
+            --text: #e0e0e0;
+            --node-bg: #6c5ce7;
+            --node-border: #a29bfe;
+            --array-hl: #00cec9;
+            --line-color: #555;
+        }
+
+        body {
+            font-family: 'Segoe UI', monospace;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px;
+            border-bottom: 1px solid #333;
+            width: 100%;
+        }
+
+        .controls {
+            background: var(--panel);
+            padding: 15px;
+            margin: 20px;
+            border-radius: 8px;
+            display: flex;
+            gap: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #2d3436;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        button:hover { background: #333; }
+        .btn-add { background: var(--node-bg); border-color: var(--node-bg); }
+        .btn-reset { background: #d63031; border-color: #d63031; }
+
+        /* Split View */
+        .container {
+            display: flex;
+            width: 95%;
+            max-width: 1200px;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .panel {
+            background: var(--panel);
+            border-radius: 10px;
+            padding: 20px;
+            flex: 1;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        h2 { font-size: 1rem; color: #888; text-transform: uppercase; margin-bottom: 20px; border-bottom: 1px solid #444; width: 100%; text-align: center; padding-bottom: 10px; }
+
+        /* Tree View */
+        #tree-svg {
+            width: 100%;
+            height: 300px;
+            border: 1px dashed #444;
+            border-radius: 4px;
+        }
+
+        .tree-node-circle {
+            fill: var(--node-bg);
+            stroke: var(--node-border);
+            stroke-width: 2px;
+            transition: all 0.3s ease;
+        }
+        .tree-node-text {
+            fill: white;
+            font-size: 14px;
+            font-weight: bold;
+            text-anchor: middle;
+            dominant-baseline: middle;
+        }
+        .tree-link {
+            stroke: var(--line-color);
+            stroke-width: 2px;
+        }
+
+        /* Array View */
+        .array-container {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 50px;
+        }
+
+        .array-slot {
+            width: 50px;
+            height: 60px;
+            background: #2d3436;
+            border: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 4px;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .slot-idx { font-size: 10px; color: #888; position: absolute; top: 2px; }
+        .slot-val { font-size: 16px; font-weight: bold; }
+        .slot-math { 
+            font-size: 9px; 
+            color: var(--array-hl); 
+            position: absolute; 
+            bottom: 2px; 
+            display: none;
+        }
+
+        .array-slot.active {
+            background: var(--node-bg);
+            border-color: #fff;
+            transform: scale(1.1);
+        }
+        
+        .array-slot.highlight-parent {
+            border-color: var(--array-hl);
+            box-shadow: 0 0 8px var(--array-hl);
+        }
+
+        /* Formula Box */
+        .formula-box {
+            margin-top: 20px;
+            padding: 10px;
+            background: #000;
+            border-radius: 4px;
+            font-family: monospace;
+            color: var(--array-hl);
+            min-height: 20px;
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Level-3: Trees & Heaps</h1>
+    <div style="font-size: 0.9em; color: #888;">"A Heap is just an Array that knows Math"</div>
+</header>
+
+<div class="controls">
+    <button class="btn-add" onclick="insertNode()">+ Insert Node</button>
+    <button class="btn-reset" onclick="resetTree()">Reset</button>
+</div>
+
+<div class="container">
+    <div class="panel">
+        <h2>Logical View (The Tree)</h2>
+        <svg id="tree-svg">
+            </svg>
+    </div>
+
+    <div class="panel">
+        <h2>Physical View (The Array)</h2>
+        <div class="array-container" id="array-display">
+            </div>
+        <div class="formula-box" id="formula-text">Click Insert to start...</div>
+    </div>
+</div>
+
+<script>
+    let heap = [];
+    const MAX_SIZE = 15; // Limit for visual clarity (4 levels)
+    const svg = document.getElementById('tree-svg');
+    const arrayContainer = document.getElementById('array-display');
+    const formulaText = document.getElementById('formula-text');
+
+    function initArray() {
+        arrayContainer.innerHTML = '';
+        for(let i=0; i<MAX_SIZE; i++) {
+            const d = document.createElement('div');
+            d.className = 'array-slot';
+            d.id = `slot-${i}`;
+            d.innerHTML = `
+                <span class="slot-idx">${i}</span>
+                <span class="slot-val"></span>
+                <span class="slot-math"></span>
+            `;
+            arrayContainer.appendChild(d);
+        }
+    }
+
+    function insertNode() {
+        if(heap.length >= MAX_SIZE) {
+            alert("Tree full for this demo!");
+            return;
+        }
+
+        const val = Math.floor(Math.random() * 90) + 10;
+        const index = heap.length;
+        heap.push(val);
+
+        // 1. Update Array View
+        updateArrayView(index, val);
+
+        // 2. Update Tree View
+        drawTree();
+
+        // 3. Teach the Math
+        if (index > 0) {
+            const parentIdx = Math.floor((index - 1) / 2);
+            highlightRelationship(parentIdx, index);
+        } else {
+            formulaText.innerText = `Root Node at Index 0`;
+        }
+    }
+
+    function updateArrayView(index, val) {
+        const slot = document.getElementById(`slot-${index}`);
+        slot.querySelector('.slot-val').innerText = val;
+        slot.classList.add('active');
+        setTimeout(() => slot.classList.remove('active'), 500);
+    }
+
+    function highlightRelationship(parentIdx, childIdx) {
+        // Clear previous highlights
+        document.querySelectorAll('.highlight-parent').forEach(el => el.classList.remove('highlight-parent'));
+        
+        // Highlight Parent in Array
+        const parentSlot = document.getElementById(`slot-${parentIdx}`);
+        parentSlot.classList.add('highlight-parent');
+
+        // Show Math
+        const isLeft = (childIdx === 2 * parentIdx + 1);
+        const mathStr = isLeft ? `Left = 2*(${parentIdx}) + 1` : `Right = 2*(${parentIdx}) + 2`;
+        
+        formulaText.innerHTML = `Placed at index <span style="color:#fff">${childIdx}</span>.<br>Parent is index <span style="color:#fff">${parentIdx}</span>.<br>${mathStr}`;
+        
+        // Update slot math text
+        const childSlot = document.getElementById(`slot-${childIdx}`);
+        childSlot.querySelector('.slot-math').innerText = isLeft ? "L (2i+1)" : "R (2i+2)";
+        childSlot.querySelector('.slot-math').style.display = 'block';
+    }
+
+    // --- SVG Tree Drawing Logic ---
+    function drawTree() {
+        svg.innerHTML = ''; // Clear canvas
+        
+        // Calculate positions
+        // Basic layout: Root at top center. Children divide width.
+        const width = svg.clientWidth;
+        const levels = Math.floor(Math.log2(heap.length)) + 1;
+        const positions = [];
+
+        // Helper to get XY
+        const getXY = (idx) => {
+            const level = Math.floor(Math.log2(idx + 1));
+            const levelNodes = Math.pow(2, level);
+            const positionInLevel = idx - (levelNodes - 1);
+            
+            // Partition width sections
+            const sectionWidth = width / levelNodes;
+            const x = (positionInLevel * sectionWidth) + (sectionWidth / 2);
+            const y = 40 + (level * 60);
+            return {x, y};
+        }
+
+        // 1. Draw Lines (Edges)
+        for(let i=1; i<heap.length; i++) {
+            const parentIdx = Math.floor((i-1)/2);
+            const start = getXY(parentIdx);
+            const end = getXY(i);
+            
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', start.x);
+            line.setAttribute('y1', start.y);
+            line.setAttribute('x2', end.x);
+            line.setAttribute('y2', end.y);
+            line.setAttribute('class', 'tree-link');
+            svg.appendChild(line);
+        }
+
+        // 2. Draw Nodes
+        for(let i=0; i<heap.length; i++) {
+            const pos = getXY(i);
+            
+            // Group for Circle + Text
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', pos.x);
+            circle.setAttribute('cy', pos.y);
+            circle.setAttribute('r', 18);
+            circle.setAttribute('class', 'tree-node-circle');
+            
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('x', pos.x);
+            text.setAttribute('y', pos.y + 1); // slight visual adjustment
+            text.textContent = heap[i];
+            text.setAttribute('class', 'tree-node-text');
+
+            g.appendChild(circle);
+            g.appendChild(text);
+            svg.appendChild(g);
+        }
+    }
+
+    function resetTree() {
+        heap = [];
+        svg.innerHTML = '';
+        initArray();
+        formulaText.innerText = "Reset complete.";
+    }
+
+    // Handle resize
+    window.addEventListener('resize', drawTree);
+    initArray();
+
+</script>
+</body>
+</html>
