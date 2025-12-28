@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSA Visualizer: ADTs (Stack & Queue)</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --panel-bg: #1e1e1e;
+            --accent-stack: #ff9f43;
+            --accent-queue: #0abde3;
+            --slot-color: #333;
+            --mem-active: #ffd700;
+        }
+
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px;
+            border-bottom: 1px solid #333;
+            width: 100%;
+        }
+
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            margin: 20px;
+            border-radius: 8px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        /* Toggles */
+        .toggle-group {
+            display: flex;
+            background: #000;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .toggle-btn {
+            padding: 8px 15px;
+            border: none;
+            background: #000;
+            color: #777;
+            cursor: pointer;
+            font-family: monospace;
+            transition: 0.2s;
+        }
+        
+        .toggle-btn.active {
+            background: #444;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        button.action-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+        }
+        
+        .btn-push { background: var(--accent-stack); color: #000; }
+        .btn-pop { background: #ff4757; color: #fff; }
+        .btn-enq { background: var(--accent-queue); color: #fff; }
+
+        /* Main Workspace */
+        .workspace {
+            display: flex;
+            width: 95%;
+            max-width: 1200px;
+            gap: 20px;
+            flex: 1;
+            margin-bottom: 20px;
+        }
+
+        /* Panels */
+        .panel {
+            background: var(--panel-bg);
+            border-radius: 10px;
+            padding: 15px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .panel-title {
+            text-transform: uppercase;
+            font-size: 0.9em;
+            color: #888;
+            margin-bottom: 15px;
+            letter-spacing: 1px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+
+        /* --- Logical View (Left) --- */
+        #logicalContainer {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed #444;
+            min-height: 300px;
+            position: relative;
+        }
+
+        /* Stack Visual */
+        .stack-container {
+            display: flex;
+            flex-direction: column-reverse; /* Bottom up */
+            width: 100px;
+            border-bottom: 4px solid #fff;
+            border-left: 4px solid #fff;
+            border-right: 4px solid #fff;
+            min-height: 200px;
+            padding: 5px;
+            gap: 2px;
+        }
+
+        /* Queue Visual */
+        .queue-container {
+            display: flex;
+            flex-direction: row; /* Left to right */
+            height: 80px;
+            border-top: 4px solid #fff;
+            border-bottom: 4px solid #fff;
+            min-width: 300px;
+            padding: 5px;
+            gap: 2px;
+            align-items: center;
+        }
+
+        .logical-node {
+            background: var(--accent-stack);
+            color: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            border-radius: 4px;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        .stack-node { height: 40px; width: 100%; }
+        .queue-node { width: 60px; height: 100%; background: var(--accent-queue); color: #fff; }
+
+        @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
+
+        /* --- Physical View (Right) --- */
+        .memory-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+            gap: 6px;
+        }
+
+        .mem-slot {
+            height: 50px;
+            background: var(--slot-color);
+            border-radius: 3px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            position: relative;
+            border: 1px solid #333;
+        }
+
+        .mem-addr { font-size: 0.6em; color: #666; position: absolute; top: 2px; left: 2px; }
+        .mem-val { font-weight: bold; font-size: 1.1em; }
+        .mem-next { font-size: 0.6em; color: var(--accent-queue); display: none; }
+
+        .mem-slot.filled { border-color: #777; }
+        .mem-slot.active { background: var(--mem-active); color: #000; transform: scale(1.1); z-index: 10; transition: 0.2s; }
+
+        /* Info Tags */
+        .status-tag {
+            position: absolute;
+            top: 10px; 
+            right: 10px;
+            font-size: 0.8em;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #333;
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Level-2: Abstract Data Types (ADT)</h1>
+    <div style="color: #888; font-size: 0.9em; margin-top:5px;">"Behaviors vs. Storage"</div>
+</header>
+
+<div class="controls">
+    <div>
+        <span style="font-size:0.8em; color:#888; display:block; margin-bottom:5px;">BEHAVIOR (ADT)</span>
+        <div class="toggle-group">
+            <button class="toggle-btn active" id="btnModeStack" onclick="setMode('stack')">STACK (LIFO)</button>
+            <button class="toggle-btn" id="btnModeQueue" onclick="setMode('queue')">QUEUE (FIFO)</button>
+        </div>
+    </div>
+
+    <div>
+        <span style="font-size:0.8em; color:#888; display:block; margin-bottom:5px;">IMPLEMENTATION (BASE)</span>
+        <div class="toggle-group">
+            <button class="toggle-btn active" id="btnImplArr" onclick="setImpl('array')">ARRAY</button>
+            <button class="toggle-btn" id="btnImplLL" onclick="setImpl('ll')">LINKED LIST</button>
+        </div>
+    </div>
+
+    <div style="margin-left:auto; display:flex; gap:10px;">
+        <button class="action-btn btn-push" id="btnAdd" onclick="addItem()">PUSH</button>
+        <button class="action-btn btn-pop" id="btnRemove" onclick="removeItem()">POP</button>
+        <button class="action-btn" style="background:#444; color:#fff;" onclick="resetAll()">RESET</button>
+    </div>
+</div>
+
+<div class="workspace">
+    <div class="panel">
+        <div class="panel-title">Logical View (What You Imagine)</div>
+        <div class="status-tag" id="logicTag">LIFO Rule Active</div>
+        <div id="logicalContainer">
+            <div class="stack-container" id="visualStack"></div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-title">Physical Memory (What RAM Does)</div>
+        <div class="status-tag" id="physTag">Contiguous Memory</div>
+        <div class="memory-grid" id="memGrid">
+            </div>
+    </div>
+</div>
+
+<script>
+    // State
+    const MEM_SIZE = 40;
+    let mode = 'stack'; // 'stack' or 'queue'
+    let impl = 'array'; // 'array' or 'll'
+    let dataStore = []; // Holds the data values
+    
+    // For Array Impl: we reserve a contiguous block
+    const ARRAY_START = 0; 
+    const ARRAY_CAPACITY = 10;
+    
+    // For LL Impl: We track nodes
+    let headAddr = null;
+    let tailAddr = null; // For Queue efficiency
+    let llMap = {}; // Map logic index to random memory address { 0: 24, 1: 5 ... }
+
+    // Init
+    const memGrid = document.getElementById('memGrid');
+    const visualStack = document.getElementById('visualStack'); // Actually used for both stack/queue
+    const logicalContainer = document.getElementById('logicalContainer');
+
+    function init() {
+        memGrid.innerHTML = '';
+        for(let i=0; i<MEM_SIZE; i++) {
+            const d = document.createElement('div');
+            d.className = 'mem-slot';
+            d.id = `mem-${i}`;
+            d.innerHTML = `<span class="mem-addr">0x${i}</span><span class="mem-val"></span><span class="mem-next"></span>`;
+            memGrid.appendChild(d);
+        }
+        updateUI();
+    }
+
+    // --- Toggles ---
+    function setMode(m) {
+        mode = m;
+        resetAll();
+        updateUI();
+    }
+    
+    function setImpl(i) {
+        impl = i;
+        resetAll();
+        updateUI();
+    }
+
+    function updateUI() {
+        // Toggle buttons visual state
+        document.getElementById('btnModeStack').className = `toggle-btn ${mode==='stack'?'active':''}`;
+        document.getElementById('btnModeQueue').className = `toggle-btn ${mode==='queue'?'active':''}`;
+        document.getElementById('btnImplArr').className = `toggle-btn ${impl==='array'?'active':''}`;
+        document.getElementById('btnImplLL').className = `toggle-btn ${impl==='ll'?'active':''}`;
+
+        // Button Labels
+        const btnAdd = document.getElementById('btnAdd');
+        const btnRemove = document.getElementById('btnRemove');
+        
+        if (mode === 'stack') {
+            btnAdd.innerText = "PUSH";
+            btnAdd.className = "action-btn btn-push";
+            btnRemove.innerText = "POP";
+            document.getElementById('logicTag').innerText = "Rule: Last In, First Out";
+            
+            // Rebuild container for stack
+            logicalContainer.innerHTML = '<div class="stack-container" id="visualStack"></div>';
+        } else {
+            btnAdd.innerText = "ENQUEUE";
+            btnAdd.className = "action-btn btn-enq";
+            btnRemove.innerText = "DEQUEUE";
+            document.getElementById('logicTag').innerText = "Rule: First In, First Out";
+
+            // Rebuild container for queue
+            logicalContainer.innerHTML = '<div class="queue-container" id="visualStack"></div>';
+        }
+
+        document.getElementById('physTag').innerText = impl === 'array' ? "Contiguous Block" : "Scattered Nodes + Pointers";
+        
+        // Visual cue for Array Reservation in Memory
+        const slots = document.querySelectorAll('.mem-slot');
+        slots.forEach(s => s.style.border = '1px solid #333');
+        
+        if (impl === 'array') {
+            for(let i=ARRAY_START; i<ARRAY_START+ARRAY_CAPACITY; i++) {
+                document.getElementById(`mem-${i}`).style.borderColor = '#555'; // Dim highlight for reserved space
+            }
+        }
+    }
+
+    // --- Actions ---
+    function addItem() {
+        if (dataStore.length >= ARRAY_CAPACITY) {
+            alert("Stack/Queue Overflow! (Demo limit reached)");
+            return;
+        }
+
+        const val = Math.floor(Math.random() * 90) + 10;
+        
+        // 1. Update Logical View
+        const container = document.getElementById('visualStack');
+        const node = document.createElement('div');
+        node.className = mode === 'stack' ? 'logical-node stack-node' : 'logical-node queue-node';
+        node.innerText = val;
+        node.id = `logic-node-${dataStore.length}`;
+        
+        // Stack pushes to top (prepend in flex-col-reverse), Queue appends
+        if(mode === 'stack') container.appendChild(node);
+        else container.appendChild(node);
+
+        // 2. Update Physical Memory
+        let addr;
+        
+        if (impl === 'array') {
+            // Array Logic: Simple index math
+            // For Stack: index = length
+            // For Queue: In a simple array implementation, we append to end.
+            // (Note: Real Circular Queues are complex, we keep it simple: Queue grows right)
+            addr = ARRAY_START + dataStore.length;
+            highlightMem(addr, val);
+        } 
+        else {
+            // LL Logic: Find random spot
+            do {
+                addr = Math.floor(Math.random() * MEM_SIZE);
+            } while (document.getElementById(`mem-${addr}`).classList.contains('filled'));
+            
+            llMap[dataStore.length] = addr; // Store mapping
+            
+            // Visual Pointer logic would go here (omitted for brevity, implied by scattered placement)
+            highlightMem(addr, val);
+            
+            // If LL, show next pointer of previous node
+            if (dataStore.length > 0) {
+               // In a real LL, we need to link previous physical node to this new address
+               // We simplified by using an array `dataStore` to track order, 
+               // but visually we should link the PREVIOUS item added.
+               const prevLogIdx = dataStore.length - 1;
+               const prevAddr = llMap[prevLogIdx];
+               if(prevAddr !== undefined) {
+                   const prevSlot = document.getElementById(`mem-${prevAddr}`);
+                   prevSlot.querySelector('.mem-next').style.display = 'block';
+                   prevSlot.querySelector('.mem-next').innerText = `→ 0x${addr}`;
+               }
+            }
+        }
+
+        dataStore.push({ val, addr });
+    }
+
+    function removeItem() {
+        if (dataStore.length === 0) return;
+
+        // 1. Logical Removal
+        let removedItem;
+        
+        if (mode === 'stack') {
+            // LIFO: Remove last added
+            removedItem = dataStore.pop();
+            const visualNode = document.getElementById(`visualStack`).lastElementChild;
+            if(visualNode) visualNode.remove();
+        } else {
+            // FIFO: Remove first added
+            removedItem = dataStore.shift();
+            const visualNode = document.getElementById(`visualStack`).firstElementChild;
+            if(visualNode) visualNode.remove();
+            
+            // Re-indexing necessary for Array Queue visualization (Shift left)
+            if(impl === 'array') {
+                resetMemVisuals();
+                // Re-paint remaining items shifted over
+                dataStore.forEach((item, idx) => {
+                   const newAddr = ARRAY_START + idx;
+                   item.addr = newAddr;
+                   highlightMem(newAddr, item.val); 
+                });
+            }
+        }
+
+        // 2. Physical Removal (Clear slot if not array shift)
+        if (impl === 'll' || (mode === 'stack' && impl === 'array')) {
+             clearMem(removedItem.addr);
+        }
+        
+        // Clean up LL map if needed
+        // (Simplified for demo)
+    }
+
+    // Helpers
+    function highlightMem(addr, val) {
+        const slot = document.getElementById(`mem-${addr}`);
+        slot.classList.add('filled', 'active');
+        slot.querySelector('.mem-val').innerText = val;
+        setTimeout(() => slot.classList.remove('active'), 400);
+    }
+
+    function clearMem(addr) {
+        const slot = document.getElementById(`mem-${addr}`);
+        slot.classList.remove('filled');
+        slot.querySelector('.mem-val').innerText = '';
+        slot.querySelector('.mem-next').innerText = '';
+        slot.querySelector('.mem-next').style.display = 'none';
+        
+        // Flash red
+        slot.style.backgroundColor = '#522';
+        setTimeout(() => slot.style.backgroundColor = '', 300);
+    }
+    
+    function resetMemVisuals() {
+        const slots = document.querySelectorAll('.mem-slot');
+        slots.forEach(s => {
+            s.className = 'mem-slot';
+            s.querySelector('.mem-val').innerText = '';
+            s.querySelector('.mem-next').style.display = 'none';
+            s.style.backgroundColor = '';
+        });
+    }
+
+    function resetAll() {
+        dataStore = [];
+        llMap = {};
+        if(visualStack) visualStack.innerHTML = '';
+        resetMemVisuals();
+    }
+
+    init();
+
+</script>
+</body>
+</html>
