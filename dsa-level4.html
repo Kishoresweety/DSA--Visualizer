@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSA Visualizer: Hash Tables</title>
+    <style>
+        :root {
+            --bg: #121212;
+            --panel: #1e1e1e;
+            --text: #e0e0e0;
+            --accent: #00b894;
+            --collision: #ff7675;
+            --bucket-bg: #2d3436;
+        }
+
+        body {
+            font-family: 'Segoe UI', monospace;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px;
+            width: 100%;
+            border-bottom: 1px solid #333;
+        }
+
+        /* Controls */
+        .controls {
+            background: var(--panel);
+            padding: 20px;
+            margin: 20px;
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            align-items: center;
+        }
+
+        input {
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            background: #000;
+            color: #fff;
+            font-family: monospace;
+            width: 150px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: var(--accent);
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        button:hover { filter: brightness(1.1); }
+
+        /* The "Math" Pipeline */
+        .pipeline {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            height: 60px;
+            font-size: 1.2rem;
+            opacity: 0; 
+            transition: opacity 0.3s;
+        }
+        .pipeline.visible { opacity: 1; }
+
+        .step-box {
+            background: #333;
+            padding: 8px 15px;
+            border-radius: 4px;
+            border: 1px solid #555;
+            position: relative;
+        }
+        
+        .arrow { font-size: 1.5rem; color: #666; }
+
+        /* The Memory Buckets */
+        .hash-table {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr); /* 2 rows of 5 */
+            gap: 15px;
+            width: 90%;
+            max-width: 1000px;
+        }
+
+        .bucket {
+            background: var(--bucket-bg);
+            border: 1px solid #444;
+            border-radius: 8px;
+            min-height: 120px;
+            padding: 10px;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .bucket-idx {
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            background: var(--accent);
+            color: #000;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        /* Linked List Items inside Buckets */
+        .chain-container {
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .data-node {
+            background: #0984e3;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            color: white;
+            animation: slideIn 0.3s ease-out;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .data-node.collision {
+            background: var(--collision); /* Red for collisions */
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .highlight {
+            border-color: var(--accent);
+            box-shadow: 0 0 15px var(--accent);
+            transform: scale(1.05);
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Level-4: Hash Tables</h1>
+    <div style="color: #888; font-style: italic;">"Don't search. Calculate."</div>
+</header>
+
+<div class="controls">
+    <input type="text" id="keyInput" placeholder="Enter text (e.g. Cat)" maxlength="8">
+    <button onclick="insertItem()">Hash & Store</button>
+    <button onclick="clearTable()" style="background:#555; color:#fff;">Reset</button>
+</div>
+
+<div class="pipeline" id="pipeline">
+    <div class="step-box" id="step-raw">"Cat"</div>
+    <div class="arrow">→</div>
+    <div class="step-box" id="step-ascii">ASCII Sum: 312</div>
+    <div class="arrow">→</div>
+    <div class="step-box" id="step-mod">% 10</div>
+    <div class="arrow">→</div>
+    <div class="step-box" style="background:var(--accent); color:black; font-weight:bold;" id="step-idx">Index: 2</div>
+</div>
+
+<div class="hash-table" id="hashGrid">
+    </div>
+
+<script>
+    const TABLE_SIZE = 10;
+    const grid = document.getElementById('hashGrid');
+    const pipeline = document.getElementById('pipeline');
+    let tableData = new Array(TABLE_SIZE).fill(0); // Track count per bucket
+
+    function initGrid() {
+        grid.innerHTML = '';
+        tableData.fill(0);
+        for(let i=0; i<TABLE_SIZE; i++) {
+            const b = document.createElement('div');
+            b.className = 'bucket';
+            b.id = `bucket-${i}`;
+            b.innerHTML = `
+                <div class="bucket-idx">Idx ${i}</div>
+                <div class="chain-container" id="chain-${i}"></div>
+            `;
+            grid.appendChild(b);
+        }
+    }
+
+    async function insertItem() {
+        const input = document.getElementById('keyInput');
+        const key = input.value.trim();
+        
+        if(!key) return;
+        
+        // 1. Calculate Hash (The Math)
+        let asciiSum = 0;
+        for(let i=0; i<key.length; i++) {
+            asciiSum += key.charCodeAt(i);
+        }
+        
+        const index = asciiSum % TABLE_SIZE;
+
+        // 2. Animate the Math Pipeline
+        document.getElementById('step-raw').innerText = `"${key}"`;
+        document.getElementById('step-ascii').innerText = `ASCII: ${asciiSum}`;
+        document.getElementById('step-idx').innerText = `Index: ${index}`;
+        
+        pipeline.classList.add('visible');
+        
+        // Pause to let user read the math
+        await new Promise(r => setTimeout(r, 800));
+
+        // 3. Highlight Target Bucket
+        const bucket = document.getElementById(`bucket-${index}`);
+        bucket.classList.add('highlight');
+        
+        await new Promise(r => setTimeout(r, 600));
+
+        // 4. Insert into Chain
+        const chain = document.getElementById(`chain-${index}`);
+        const node = document.createElement('div');
+        
+        // Check collision for styling
+        const isCollision = tableData[index] > 0;
+        node.className = isCollision ? 'data-node collision' : 'data-node';
+        node.innerHTML = `<span>${key}</span> <span style="font-size:0.7em; opacity:0.7;">(${asciiSum})</span>`;
+        
+        if(isCollision) {
+            // Visual feedback for linked list chaining
+            node.title = "Collision! Chained via Linked List";
+        }
+
+        chain.appendChild(node);
+        tableData[index]++;
+
+        // Cleanup
+        setTimeout(() => {
+            bucket.classList.remove('highlight');
+            pipeline.classList.remove('visible');
+            input.value = '';
+            input.focus();
+        }, 1000);
+    }
+
+    function clearTable() {
+        initGrid();
+        pipeline.classList.remove('visible');
+    }
+
+    // Init
+    initGrid();
+
+    // Allow Enter key
+    document.getElementById('keyInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') insertItem();
+    });
+
+</script>
+</body>
+</html>
