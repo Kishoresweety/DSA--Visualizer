@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSA Internals: The Visual Syllabus</title>
+    <style>
+        :root {
+            --bg: #121212;
+            --card-bg: #1e1e1e;
+            --text-main: #ffffff;
+            --text-sub: #b0b0b0;
+            --accent: #00cec9;
+            --hover-glow: rgba(0, 206, 201, 0.4);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* Hero Section */
+        header {
+            text-align: center;
+            padding: 60px 20px;
+            max-width: 800px;
+            animation: fadeIn 1s ease-out;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #fff, #aaa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            font-size: 1.2rem;
+            color: var(--text-sub);
+            line-height: 1.6;
+        }
+
+        .highlight { color: var(--accent); font-weight: bold; }
+
+        /* Grid Layout */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            width: 90%;
+            max-width: 1200px;
+            padding-bottom: 50px;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 25px;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            text-decoration: none;
+            color: inherit;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px -10px var(--hover-glow);
+            border-color: var(--accent);
+        }
+
+        .level-badge {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--accent);
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            margin: 0 0 10px 0;
+            font-weight: 600;
+        }
+
+        .card-desc {
+            font-size: 0.95rem;
+            color: var(--text-sub);
+            margin-bottom: 20px;
+            flex-grow: 1;
+        }
+
+        .card-arrow {
+            align-self: flex-end;
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: var(--accent);
+        }
+
+        /* Footer */
+        footer {
+            margin-top: auto;
+            padding: 20px;
+            color: #555;
+            font-size: 0.9rem;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 2.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>DSA Internals</h1>
+        <p class="subtitle">
+            Don't memorize code. Visualize the <span class="highlight">Memory</span>.<br>
+            An interactive journey through the machine.
+        </p>
+    </header>
+
+    <div class="grid-container">
+
+        <a href="dsa-level1.html" class="card">
+            <div class="level-badge">Level 1: The Foundation</div>
+            <h2 class="card-title">Memory: Arrays vs Linked Lists</h2>
+            <p class="card-desc">
+                Stop looking at diagrams of "train cars." Look at the raw RAM. 
+                See why Arrays are fast and Linked Lists are scattered.
+            </p>
+            <div class="card-arrow">Start &rarr;</div>
+        </a>
+
+        <a href="dsa-level2.html" class="card">
+            <div class="level-badge">Level 2: Abstraction</div>
+            <h2 class="card-title">Stacks & Queues</h2>
+            <p class="card-desc">
+                Is a Stack a real thing? No. It's a behavior. 
+                Toggle between Array and Linked List implementations to see the truth.
+            </p>
+            <div class="card-arrow">Start &rarr;</div>
+        </a>
+
+        <a href="dsa-level3.html" class="card">
+            <div class="level-badge">Level 3: Hierarchy</div>
+            <h2 class="card-title">Trees & Heaps</h2>
+            <p class="card-desc">
+                How do you fit a Pyramid into a flat Array? 
+                Visualize the math magic behind Heaps and Binary Trees.
+            </p>
+            <div class="card-arrow">Start &rarr;</div>
+        </a>
+
+        <a href="dsa-level4.html" class="card">
+            <div class="level-badge">Level 4: Lookup</div>
+            <h2 class="card-title">Hash Tables</h2>
+            <p class="card-desc">
+                The "Magic Box" of O(1) access. 
+                Watch strings turn into numbers and handle collisions in real-time.
+            </p>
+            <div class="card-arrow">Start &rarr;</div>
+        </a>
+
+        <a href="dsa-level5.html" class="card">
+            <div class="level-badge">Level 5: Connections</div>
+            <h2 class="card-title">Graphs (BFS & DFS)</h2>
+            <p class="card-desc">
+                Draw your own web of nodes. 
+                Watch the difference between the "Ripple" (BFS) and the "Maze Runner" (DFS).
+            </p>
+            <div class="card-arrow">Start &rarr;</div>
+        </a>
+
+    </div>
+
+    <footer>
+        "The true base is: MEMORY + VARIABLES"
+    </footer>
+
+</body>
+</html>
