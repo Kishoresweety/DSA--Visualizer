@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSA Visualizer: Graphs (BFS/DFS)</title>
+    <style>
+        :root {
+            --bg: #121212;
+            --panel: #1e1e1e;
+            --text: #e0e0e0;
+            --node: #0984e3;
+            --selected: #fdcb6e;
+            --visited: #00b894;
+            --visiting: #e17055;
+            --edge: #636e72;
+        }
+
+        body {
+            font-family: 'Segoe UI', monospace;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            user-select: none;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px;
+            border-bottom: 1px solid #333;
+            width: 100%;
+        }
+
+        /* Controls */
+        .controls {
+            background: var(--panel);
+            padding: 15px;
+            margin: 15px;
+            border-radius: 8px;
+            display: flex;
+            gap: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #2d3436;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        button:hover { background: #333; }
+        
+        .btn-algo { background: #6c5ce7; border: none; }
+        .btn-reset { background: #d63031; border: none; }
+
+        .instruction { font-size: 0.8rem; color: #888; margin-top: 5px; }
+
+        /* Layout */
+        .container {
+            display: flex;
+            width: 95%;
+            height: 70vh;
+            gap: 20px;
+        }
+
+        /* Left: Drawing Canvas */
+        .canvas-container {
+            flex: 2;
+            background: #181818;
+            border: 1px dashed #444;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            cursor: crosshair;
+        }
+
+        svg { width: 100%; height: 100%; }
+
+        circle {
+            fill: var(--node);
+            stroke: #fff;
+            stroke-width: 2px;
+            transition: fill 0.3s;
+            cursor: pointer;
+        }
+        circle:hover { filter: brightness(1.2); }
+        circle.selected { fill: var(--selected); stroke: #fff; stroke-width: 4px; }
+        circle.visited { fill: var(--visited); }
+        circle.active { fill: var(--visiting); }
+
+        line { stroke: var(--edge); stroke-width: 3px; }
+        
+        text {
+            fill: white;
+            font-size: 14px;
+            font-weight: bold;
+            pointer-events: none;
+            text-anchor: middle;
+            dominant-baseline: middle;
+        }
+
+        /* Right: Adjacency List */
+        .data-panel {
+            flex: 1;
+            background: var(--panel);
+            border-radius: 8px;
+            padding: 20px;
+            overflow-y: auto;
+            border: 1px solid #333;
+        }
+
+        h3 { margin-top: 0; color: #aaa; border-bottom: 1px solid #444; padding-bottom: 10px; }
+
+        .adj-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        .node-box {
+            width: 30px;
+            height: 30px;
+            background: var(--node);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .arrow { margin-right: 10px; color: #666; }
+
+        .neighbor-list { display: flex; gap: 5px; flex-wrap: wrap; }
+        
+        .neighbor {
+            background: #444;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Level-5: Graphs</h1>
+    <div style="font-size: 0.9em; color: #888;">"Nodes, Edges, and how we get lost in them."</div>
+</header>
+
+<div class="controls">
+    <div>
+        <button class="btn-algo" onclick="runBFS()">Run BFS (Ripples)</button>
+        <button class="btn-algo" onclick="runDFS()">Run DFS (Maze)</button>
+        <button class="btn-reset" onclick="resetGraph()">Clear All</button>
+    </div>
+    <div class="instruction">
+        👉 <b>Click empty space</b> to add Node.<br>
+        👉 <b>Click two nodes</b> to connect them.
+    </div>
+</div>
+
+<div class="container">
+    <div class="canvas-container" id="canvasBox">
+        <svg id="graphSvg"></svg>
+    </div>
+
+    <div class="data-panel">
+        <h3>Adjacency List (RAM)</h3>
+        <div id="adjListDisplay">
+            <div style="color:#666; font-style:italic;">Graph is empty...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const svg = document.getElementById('graphSvg');
+    const adjDisplay = document.getElementById('adjListDisplay');
+    const canvasBox = document.getElementById('canvasBox');
+    
+    let nodes = []; // {id, x, y}
+    let edges = []; // {from, to}
+    let selectedNode = null;
+    let isRunning = false;
+
+    // --- Interaction ---
+    
+    // Add Node
+    canvasBox.addEventListener('click', (e) => {
+        if(e.target.tagName === 'circle' || isRunning) return;
+        
+        const rect = canvasBox.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        createNode(x, y);
+    });
+
+    function createNode(x, y) {
+        const id = nodes.length;
+        nodes.push({ id, x, y });
+        render();
+    }
+
+    // Select/Connect Node
+    function handleNodeClick(e, id) {
+        e.stopPropagation(); // Stop bubbling to canvas
+        if(isRunning) return;
+
+        if(selectedNode === null) {
+            selectedNode = id;
+        } else {
+            if(selectedNode !== id) {
+                createEdge(selectedNode, id);
+            }
+            selectedNode = null;
+        }
+        render();
+    }
+
+    function createEdge(from, to) {
+        // Check if exists
+        const exists = edges.some(e => 
+            (e.from === from && e.to === to) || (e.from === to && e.to === from)
+        );
+        if(!exists) {
+            edges.push({ from, to });
+        }
+    }
+
+    // --- Rendering ---
+
+    function render() {
+        svg.innerHTML = '';
+        adjDisplay.innerHTML = '';
+
+        // 1. Draw Edges (Lines)
+        edges.forEach(e => {
+            const n1 = nodes[e.from];
+            const n2 = nodes[e.to];
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', n1.x);
+            line.setAttribute('y1', n1.y);
+            line.setAttribute('x2', n2.x);
+            line.setAttribute('y2', n2.y);
+            svg.appendChild(line);
+        });
+
+        // 2. Draw Nodes (Circles)
+        nodes.forEach(n => {
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            g.setAttribute('onclick', `handleNodeClick(event, ${n.id})`);
+            
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', n.x);
+            circle.setAttribute('cy', n.y);
+            circle.setAttribute('r', 20);
+            circle.setAttribute('id', `node-${n.id}`);
+            if(selectedNode === n.id) circle.classList.add('selected');
+            
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('x', n.x);
+            text.setAttribute('y', n.y + 1);
+            text.textContent = n.id;
+
+            g.appendChild(circle);
+            g.appendChild(text);
+            svg.appendChild(g);
+        });
+
+        // 3. Update Adjacency List Panel
+        if(nodes.length === 0) {
+            adjDisplay.innerHTML = '<div style="color:#666; font-style:italic;">Graph is empty...</div>';
+            return;
+        }
+
+        nodes.forEach(n => {
+            // Find neighbors
+            const neighbors = edges
+                .filter(e => e.from === n.id || e.to === n.id)
+                .map(e => e.from === n.id ? e.to : e.from);
+            
+            const row = document.createElement('div');
+            row.className = 'adj-row';
+            
+            let neighborHtml = neighbors.map(nbr => `<div class="neighbor">${nbr}</div>`).join('');
+            if(neighbors.length === 0) neighborHtml = '<span style="color:#555; font-size:0.8em;">No connections</span>';
+
+            row.innerHTML = `
+                <div class="node-box">${n.id}</div>
+                <div class="arrow">→</div>
+                <div class="neighbor-list">${neighborHtml}</div>
+            `;
+            adjDisplay.appendChild(row);
+        });
+    }
+
+    // --- Algorithms ---
+
+    function getAdjacencyMap() {
+        const map = {};
+        nodes.forEach(n => map[n.id] = []);
+        edges.forEach(e => {
+            map[e.from].push(e.to);
+            map[e.to].push(e.from);
+        });
+        return map;
+    }
+
+    async function runBFS() {
+        if(nodes.length === 0 || isRunning) return;
+        isRunning = true;
+        resetVisuals();
+        
+        const graph = getAdjacencyMap();
+        const startNode = 0; // Always start at 0 for simplicity
+        const queue = [startNode];
+        const visited = new Set();
+        visited.add(startNode);
+
+        while(queue.length > 0) {
+            const current = queue.shift();
+            
+            // Highlight Current (Visiting)
+            const el = document.getElementById(`node-${current}`);
+            el.classList.add('active');
+            await new Promise(r => setTimeout(r, 600));
+            el.classList.remove('active');
+            el.classList.add('visited'); // Mark processed
+
+            // Add neighbors
+            for(let neighbor of graph[current]) {
+                if(!visited.has(neighbor)) {
+                    visited.add(neighbor);
+                    queue.push(neighbor);
+                }
+            }
+        }
+        isRunning = false;
+    }
+
+    async function runDFS() {
+        if(nodes.length === 0 || isRunning) return;
+        isRunning = true;
+        resetVisuals();
+
+        const graph = getAdjacencyMap();
+        const visited = new Set();
+
+        async function dfs(node) {
+            visited.add(node);
+            
+            // Highlight
+            const el = document.getElementById(`node-${node}`);
+            el.classList.add('active');
+            await new Promise(r => setTimeout(r, 600));
+            el.classList.remove('active');
+            el.classList.add('visited');
+
+            // Dive deeper
+            for(let neighbor of graph[node]) {
+                if(!visited.has(neighbor)) {
+                    await dfs(neighbor);
+                }
+            }
+        }
+
+        await dfs(0);
+        isRunning = false;
+    }
+
+    function resetVisuals() {
+        document.querySelectorAll('circle').forEach(c => {
+            c.classList.remove('visited', 'active');
+        });
+    }
+
+    function resetGraph() {
+        nodes = [];
+        edges = [];
+        selectedNode = null;
+        render();
+    }
+    
+    // Init demo graph
+    createNode(100, 100); // 0
+    createNode(300, 100); // 1
+    createNode(100, 300); // 2
+    createEdge(0, 1);
+    createEdge(0, 2);
+
+</script>
+</body>
+</html>
